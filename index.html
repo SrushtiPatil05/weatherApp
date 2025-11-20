@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Weather App (No API Key)</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Poppins, sans-serif;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 380px;
+            padding: 25px;
+            border-radius: 18px;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+            color: white;
+            text-align: center;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            outline: none;
+        }
+
+        button {
+            padding: 12px 16px;
+            border-radius: 10px;
+            background: #fff;
+            color: #007BFF;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+
+        .weather {
+            margin-top: 20px;
+            display: none;
+            color: white;
+        }
+
+        .temp {
+            font-size: 45px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🌦 Live Weather App</h2>
+
+        <div class="search-box">
+            <input type="text" id="cityInput" placeholder="Enter city name...">
+            <button onclick="getWeather()">Search</button>
+        </div>
+
+        <div class="weather" id="weatherBox"></div>
+    </div>
+
+<script>
+    async function getWeather() {
+        let city = document.getElementById("cityInput").value;
+        let weatherBox = document.getElementById("weatherBox");
+
+        if (city.trim() === "") {
+            alert("Please enter a city name!");
+            return;
+        }
+
+        // 1. Get city → convert to coordinates
+        let geoURL = `https://geocoding-api.open-meteo.com/v1/search?name=${city}`;
+        let geoRes = await fetch(geoURL);
+        let geoData = await geoRes.json();
+
+        if (!geoData.results) {
+            weatherBox.style.display = "block";
+            weatherBox.innerHTML = `<p style="color: yellow;">❌ City not found.</p>`;
+            return;
+        }
+
+        let lat = geoData.results[0].latitude;
+        let lon = geoData.results[0].longitude;
+        let place = geoData.results[0].name;
+
+        // 2. Fetch weather details (Free + No key)
+        let weatherURL = 
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+
+        let weatherRes = await fetch(weatherURL);
+        let weatherData = await weatherRes.json();
+
+        let temp = weatherData.current_weather.temperature;
+        let wind = weatherData.current_weather.windspeed;
+
+        weatherBox.style.display = "block";
+        weatherBox.innerHTML = `
+            <h3>${place}</h3>
+            <div class="temp">${temp}°C</div>
+            <p><b>Wind:</b> ${wind} km/h</p>
+            <p><b>Weather Code:</b> ${weatherData.current_weather.weathercode}</p>
+        `;
+    }
+</script>
+
+</body>
+</html>
