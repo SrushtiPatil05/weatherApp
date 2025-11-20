@@ -3,27 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Advanced Weather App (Light Theme Only)</title>
+<title>Ultimate Weather App (No API Key)</title>
+
+<!-- Chart.js (for hourly graph) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+    /* -------------------------------------------------
+       Modern Glass Styles + Animated Backgrounds
+    ---------------------------------------------------*/
     body {
         margin: 0;
         font-family: Poppins, sans-serif;
-        background: linear-gradient(135deg, #4facfe, #00f2fe);
         height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
         color: #fff;
+        transition: 0.4s ease;
+        background-size: cover;
+        background-position: center;
     }
 
+    /* Animated backgrounds */
+    .sunny { background: url("https://i.imgur.com/0aC0F4s.gif"); }
+    .rain { background: url("https://i.imgur.com/6YCjZqS.gif"); }
+    .snow { background: url("https://i.imgur.com/r20lB6n.gif"); }
+    .cloudy { background: url("https://i.imgur.com/VBmU1Ln.gif"); }
+    .storm { background: url("https://i.imgur.com/Kh0AijM.gif"); }
+    .fog { background: url("https://i.imgur.com/S6FZ0kq.gif"); }
+
     .container {
-        width: 420px;
-        padding: 25px;
+        width: 450px;
+        padding: 30px;
         border-radius: 20px;
-        backdrop-filter: blur(12px);
-        background: rgba(255, 255, 255, 0.25);
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.18);
+        box-shadow: 0 0 30px rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(14px);
         text-align: center;
     }
 
@@ -39,32 +55,26 @@
         border-radius: 10px;
         border: none;
         outline: none;
-        font-size: 15px;
     }
 
     button {
-        padding: 12px 16px;
+        padding: 12px;
         border-radius: 10px;
-        background: #fff;
-        color: #007BFF;
-        font-weight: bold;
         border: none;
+        font-weight: bold;
         cursor: pointer;
-        transition: 0.2s;
-    }
-
-    button:hover {
-        transform: scale(1.05);
+        color: #007BFF;
+        background: #fff;
     }
 
     .weather {
         display: none;
+        margin-top: 15px;
     }
 
     .temp {
-        font-size: 48px;
-        font-weight: 700;
-        margin: 10px 0;
+        font-size: 50px;
+        font-weight: bold;
     }
 
     .icon {
@@ -72,19 +82,19 @@
     }
 
     .details p {
-        margin: 5px 0;
+        margin: 3px 0;
         font-size: 16px;
     }
 
     .forecast {
         margin-top: 20px;
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(7, 1fr);
         gap: 8px;
     }
 
     .forecast-card {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.25);
         padding: 10px;
         border-radius: 12px;
         backdrop-filter: blur(5px);
@@ -94,113 +104,215 @@
         width: 40px;
     }
 
-    .day {
-        font-size: 14px;
+    .loader {
+        display: none;
+        margin-top: 15px;
+        font-size: 18px;
         font-weight: bold;
     }
+
+    .loader::after {
+        content: "⏳ Loading...";
+        animation: dots 1s infinite;
+    }
+
+    @keyframes dots {
+        0% { content: "⏳ Loading"; }
+        33% { content: "⏳ Loading."; }
+        66% { content: "⏳ Loading.."; }
+        100% { content: "⏳ Loading..."; }
+    }
+
 </style>
 </head>
-
-<body>
+<body class="sunny">
 
 <div class="container">
-
-    <h2>🌦 Advanced Weather App</h2>
+    <h2>🌦 Ultimate Weather App</h2>
 
     <div class="search-box">
         <input type="text" id="cityInput" placeholder="Enter city name...">
         <button onclick="getWeather()">Search</button>
     </div>
 
+    <div id="loader" class="loader"></div>
+
     <div class="weather" id="weatherBox"></div>
+
+    <canvas id="hourlyChart" width="400" height="200"></canvas>
+
 </div>
 
 <script>
-    function weatherIcon(code) {
-        if (code < 3) return "https://openweathermap.org/img/wn/01d.png";
-        if (code === 3) return "https://openweathermap.org/img/wn/03d.png";
-        if (code <= 48) return "https://openweathermap.org/img/wn/50d.png";
-        if (code <= 57) return "https://openweathermap.org/img/wn/13d.png";
-        if (code <= 67) return "https://openweathermap.org/img/wn/09d.png";
-        if (code <= 77) return "https://openweathermap.org/img/wn/13d.png";
-        if (code <= 86) return "https://openweathermap.org/img/wn/13d.png";
-        return "https://openweathermap.org/img/wn/11d.png";
+
+    /* -------------------------------------------------
+       Convert weather codes → readable descriptions + icons
+    ---------------------------------------------------*/
+    function weatherInfo(code) {
+        const map = {
+            0: ["Clear Sky", "01d"],
+            1: ["Mainly Clear", "02d"],
+            2: ["Partly Cloudy", "03d"],
+            3: ["Overcast", "04d"],
+            45: ["Fog", "50d"],
+            48: ["Depositing Rime Fog", "50d"],
+            51: ["Light Drizzle", "09d"],
+            53: ["Moderate Drizzle", "09d"],
+            55: ["Dense Drizzle", "09d"],
+            61: ["Slight Rain", "10d"],
+            63: ["Moderate Rain", "10d"],
+            65: ["Heavy Rain", "10d"],
+            71: ["Slight Snow", "13d"],
+            73: ["Moderate Snow", "13d"],
+            75: ["Heavy Snow", "13d"],
+            80: ["Rain Showers", "09d"],
+            95: ["Thunderstorm", "11d"],
+        };
+
+        return map[code] || ["Unknown", "03d"];
     }
 
+    function bgByWeather(code) {
+        if (code === 0) return "sunny";
+        if ([1, 2, 3].includes(code)) return "cloudy";
+        if ([51, 53, 55, 61, 63, 65, 80].includes(code)) return "rain";
+        if ([71, 73, 75].includes(code)) return "snow";
+        if (code === 95) return "storm";
+        if ([45, 48].includes(code)) return "fog";
+        return "cloudy";
+    }
+
+    /* -------------------------------------------------
+       Main Function
+    ---------------------------------------------------*/
     async function getWeather() {
         let city = document.getElementById("cityInput").value;
         let weatherBox = document.getElementById("weatherBox");
+        let loader = document.getElementById("loader");
+        let chartCanvas = document.getElementById("hourlyChart");
 
         if (city.trim() === "") {
-            alert("Please enter a city name!");
+            alert("Enter a city name!");
             return;
         }
 
-        // 1. Convert city → coordinates
+        loader.style.display = "block";
+        weatherBox.style.display = "none";
+        chartCanvas.style.display = "none";
+
+        // 1. Get coordinates
         let geoURL = `https://geocoding-api.open-meteo.com/v1/search?name=${city}`;
         let geoRes = await fetch(geoURL);
         let geoData = await geoRes.json();
 
         if (!geoData.results) {
+            loader.style.display = "none";
             weatherBox.style.display = "block";
-            weatherBox.innerHTML = `<p style="color: yellow;">❌ City not found.</p>`;
+            weatherBox.innerHTML = `<p style="color: yellow;">City not found.</p>`;
             return;
         }
 
-        let lat = geoData.results[0].latitude;
-        let lon = geoData.results[0].longitude;
-        let place = geoData.results[0].name;
+        let { latitude, longitude, name } = geoData.results[0];
 
-        // 2. Fetch weather data
-        let weatherURL =
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relativehumidity_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
+        /* -------------------------------------------------
+           2. Get weather data:
+           - current
+           - hourly forecast (24 hours)
+           - daily forecast (7 days)
+           - yesterday (past)
+        ---------------------------------------------------*/
+        let today = new Date().toISOString().split("T")[0];
+        let yesterday = new Date(Date.now() - 86400000)
+            .toISOString().split("T")[0];
 
-        let res = await fetch(weatherURL);
+        let url =
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+            `&current_weather=true` +
+            `&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,weathercode` +
+            `&past_days=1&forecast_days=7&timezone=auto`;
+
+        let res = await fetch(url);
         let data = await res.json();
 
-        let temp = data.current_weather.temperature;
-        let wind = data.current_weather.windspeed;
-        let code = data.current_weather.weathercode;
+        let cw = data.current_weather;
+        let [desc, iconCode] = weatherInfo(cw.weathercode);
 
-        let humidity = data.hourly.relativehumidity_2m[0];
-        let feels = data.hourly.apparent_temperature[0];
-        let icon = weatherIcon(code);
+        // Set animated background
+        document.body.className = bgByWeather(cw.weathercode);
 
-        // 3. Build 5-day forecast
+        // Build 7-day forecast
         let forecastHTML = "";
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
             let day = data.daily.time[i].substring(5);
-            let min = data.daily.temperature_2m_min[i];
             let max = data.daily.temperature_2m_max[i];
-            let ic = weatherIcon(data.daily.weathercode[i]);
+            let min = data.daily.temperature_2m_min[i];
+            let code = data.daily.weathercode[i];
+            let [d, ic] = weatherInfo(code);
 
             forecastHTML += `
                 <div class="forecast-card">
-                    <div class="day">${day}</div>
-                    <img src="${ic}">
+                    <div>${day}</div>
+                    <img src="https://openweathermap.org/img/wn/${ic}.png">
+                    <div>${d}</div>
                     <div>${min}° / ${max}°</div>
                 </div>
             `;
         }
 
-        // 4. Display data
+        // Yesterday:
+        let yesterdayTemp = data.daily.temperature_2m_max[0];
+
+        // Fill HTML
+        loader.style.display = "none";
+
         weatherBox.style.display = "block";
         weatherBox.innerHTML = `
-            <h3>${place}</h3>
-            <img class="icon" src="${icon}">
-            <div class="temp">${temp}°C</div>
+            <h3>${name}</h3>
+            <img class="icon" src="https://openweathermap.org/img/wn/${iconCode}.png">
+            <div class="temp">${cw.temperature}°C</div>
+            <p><b>${desc}</b></p>
 
             <div class="details">
-                <p><b>Feels Like:</b> ${feels}°C</p>
-                <p><b>Humidity:</b> ${humidity}%</p>
-                <p><b>Wind Speed:</b> ${wind} km/h</p>
-                <p><b>Weather Code:</b> ${code}</p>
+                <p><b>Wind:</b> ${cw.windspeed} km/h</p>
+                <p><b>Feels-like:</b> ${cw.temperature}°C (approx)</p>
+                <p><b>Yesterday Max Temp:</b> ${yesterdayTemp}°C</p>
             </div>
 
-            <h3>5-Day Forecast</h3>
+            <h3>7-Day Forecast</h3>
             <div class="forecast">${forecastHTML}</div>
         `;
+
+        /* -------------------------------------------------
+           Build Hourly Chart (Next 24 Hours)
+        ---------------------------------------------------*/
+        let hours = data.hourly.time.slice(0, 24).map(t => t.substring(11, 16));
+        let temps = data.hourly.temperature_2m.slice(0, 24);
+
+        chartCanvas.style.display = "block";
+
+        new Chart(chartCanvas, {
+            type: "line",
+            data: {
+                labels: hours,
+                datasets: [{
+                    label: "Temperature (°C) next 24h",
+                    data: temps,
+                    borderColor: "#fff",
+                    backgroundColor: "rgba(255,255,255,0.3)",
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                plugins: { legend: { labels: { color: "#fff" } } },
+                scales: {
+                    x: { ticks: { color: "#fff" } },
+                    y: { ticks: { color: "#fff" } }
+                }
+            }
+        });
     }
+
 </script>
 
 </body>
