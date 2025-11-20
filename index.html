@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Weather App (No API Key)</title>
+<title>Modern Weather App</title>
 
-<!-- Chart.js (for hourly graph) -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    /* -------------------------------------------------
-       Modern Glass Styles + Animated Backgrounds
-    ---------------------------------------------------*/
+
+    /* ---------------------------------------------------------
+       Animated Gradient Background (CSS Only)
+    ---------------------------------------------------------*/
     body {
         margin: 0;
         font-family: Poppins, sans-serif;
@@ -20,29 +21,36 @@
         justify-content: center;
         align-items: center;
         color: #fff;
-        transition: 0.4s ease;
-        background-size: cover;
-        background-position: center;
+
+        /* Smooth animated gradient */
+        background: linear-gradient(135deg, #4facfe, #00f2fe, #7b2ff7, #21d4fd);
+        background-size: 400% 400%;
+        animation: gradientMove 12s ease infinite;
     }
 
-    /* Animated backgrounds */
-    .sunny { background: url("https://i.imgur.com/0aC0F4s.gif"); }
-    .rain { background: url("https://i.imgur.com/6YCjZqS.gif"); }
-    .snow { background: url("https://i.imgur.com/r20lB6n.gif"); }
-    .cloudy { background: url("https://i.imgur.com/VBmU1Ln.gif"); }
-    .storm { background: url("https://i.imgur.com/Kh0AijM.gif"); }
-    .fog { background: url("https://i.imgur.com/S6FZ0kq.gif"); }
+    @keyframes gradientMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
 
+    /* ---------------------------------------------------------
+       GLASS CONTAINER (No clipping, auto-resize)
+    ---------------------------------------------------------*/
     .container {
-        width: 450px;
-        padding: 30px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.18);
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.35);
-        backdrop-filter: blur(14px);
+        width: min(95%, 500px);
+        padding: 25px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
         text-align: center;
+        overflow: hidden;
     }
 
+    /* ---------------------------------------------------------
+       Search Box
+    ---------------------------------------------------------*/
     .search-box {
         display: flex;
         gap: 10px;
@@ -58,77 +66,95 @@
     }
 
     button {
-        padding: 12px;
+        padding: 12px 16px;
         border-radius: 10px;
-        border: none;
         font-weight: bold;
+        border: none;
         cursor: pointer;
-        color: #007BFF;
         background: #fff;
+        color: #007BFF;
+        transition: 0.2s;
     }
 
-    .weather {
-        display: none;
-        margin-top: 15px;
-    }
+    button:hover { transform: scale(1.05); }
+
+    /* ---------------------------------------------------------
+       Weather Section
+    ---------------------------------------------------------*/
+    .weather { display: none; }
 
     .temp {
-        font-size: 50px;
-        font-weight: bold;
+        font-size: 48px;
+        font-weight: 700;
+        margin: 10px 0;
     }
 
     .icon {
         width: 90px;
+        margin-bottom: 8px;
     }
 
     .details p {
         margin: 3px 0;
-        font-size: 16px;
+        font-size: 17px;
     }
 
+    /* ---------------------------------------------------------
+       7-Day Forecast
+    ---------------------------------------------------------*/
     .forecast {
         margin-top: 20px;
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 8px;
+        display: flex;
+        overflow-x: auto;
+        gap: 12px;
+        padding-bottom: 10px;
+        scrollbar-width: thin;
     }
 
     .forecast-card {
-        background: rgba(255, 255, 255, 0.25);
-        padding: 10px;
-        border-radius: 12px;
-        backdrop-filter: blur(5px);
+        min-width: 90px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.22);
+        backdrop-filter: blur(6px);
+        text-align: center;
+        flex-shrink: 0;
     }
 
-    .forecast-card img {
-        width: 40px;
-    }
+    .forecast-card img { width: 40px; }
 
+    .forecast-card div { font-size: 14px; }
+
+    /* ---------------------------------------------------------
+       Loading Spinner
+    ---------------------------------------------------------*/
     .loader {
         display: none;
-        margin-top: 15px;
         font-size: 18px;
         font-weight: bold;
+        margin-top: 15px;
     }
 
     .loader::after {
-        content: "⏳ Loading...";
+        content: "Loading";
         animation: dots 1s infinite;
     }
 
     @keyframes dots {
-        0% { content: "⏳ Loading"; }
-        33% { content: "⏳ Loading."; }
-        66% { content: "⏳ Loading.."; }
-        100% { content: "⏳ Loading..."; }
+        0% { content: "Loading"; }
+        33% { content: "Loading."; }
+        66% { content: "Loading.."; }
+        100% { content: "Loading..."; }
     }
 
 </style>
 </head>
-<body class="sunny">
+
+<body>
 
 <div class="container">
-    <h2>🌦 Ultimate Weather App</h2>
+
+    <h2>🌤 Modern Weather App</h2>
 
     <div class="search-box">
         <input type="text" id="cityInput" placeholder="Enter city name...">
@@ -139,175 +165,112 @@
 
     <div class="weather" id="weatherBox"></div>
 
-    <canvas id="hourlyChart" width="400" height="200"></canvas>
+    <canvas id="hourlyChart" style="margin-top: 25px;"></canvas>
 
 </div>
 
 <script>
 
-    /* -------------------------------------------------
-       Convert weather codes → readable descriptions + icons
-    ---------------------------------------------------*/
     function weatherInfo(code) {
         const map = {
-            0: ["Clear Sky", "01d"],
-            1: ["Mainly Clear", "02d"],
-            2: ["Partly Cloudy", "03d"],
-            3: ["Overcast", "04d"],
-            45: ["Fog", "50d"],
-            48: ["Depositing Rime Fog", "50d"],
-            51: ["Light Drizzle", "09d"],
-            53: ["Moderate Drizzle", "09d"],
-            55: ["Dense Drizzle", "09d"],
-            61: ["Slight Rain", "10d"],
-            63: ["Moderate Rain", "10d"],
-            65: ["Heavy Rain", "10d"],
-            71: ["Slight Snow", "13d"],
-            73: ["Moderate Snow", "13d"],
-            75: ["Heavy Snow", "13d"],
-            80: ["Rain Showers", "09d"],
-            95: ["Thunderstorm", "11d"],
+            0:["Clear Sky","01d"],1:["Mainly Clear","02d"],2:["Partly Cloudy","03d"],3:["Overcast","04d"],
+            45:["Fog","50d"],48:["Fog","50d"],
+            51:["Light Drizzle","09d"],53:["Moderate Drizzle","09d"],55:["Dense Drizzle","09d"],
+            61:["Light Rain","10d"],63:["Moderate Rain","10d"],65:["Heavy Rain","10d"],
+            71:["Light Snow","13d"],73:["Mod Snow","13d"],75:["Heavy Snow","13d"],
+            80:["Rain Showers","09d"],95:["Thunderstorm","11d"]
         };
-
-        return map[code] || ["Unknown", "03d"];
+        return map[code] || ["Unknown","03d"];
     }
 
-    function bgByWeather(code) {
-        if (code === 0) return "sunny";
-        if ([1, 2, 3].includes(code)) return "cloudy";
-        if ([51, 53, 55, 61, 63, 65, 80].includes(code)) return "rain";
-        if ([71, 73, 75].includes(code)) return "snow";
-        if (code === 95) return "storm";
-        if ([45, 48].includes(code)) return "fog";
-        return "cloudy";
-    }
-
-    /* -------------------------------------------------
-       Main Function
-    ---------------------------------------------------*/
     async function getWeather() {
         let city = document.getElementById("cityInput").value;
         let weatherBox = document.getElementById("weatherBox");
         let loader = document.getElementById("loader");
         let chartCanvas = document.getElementById("hourlyChart");
 
-        if (city.trim() === "") {
-            alert("Enter a city name!");
-            return;
-        }
-
-        loader.style.display = "block";
         weatherBox.style.display = "none";
+        loader.style.display = "block";
         chartCanvas.style.display = "none";
 
-        // 1. Get coordinates
         let geoURL = `https://geocoding-api.open-meteo.com/v1/search?name=${city}`;
         let geoRes = await fetch(geoURL);
         let geoData = await geoRes.json();
-
         if (!geoData.results) {
             loader.style.display = "none";
             weatherBox.style.display = "block";
-            weatherBox.innerHTML = `<p style="color: yellow;">City not found.</p>`;
+            weatherBox.innerHTML = `<p>City not found</p>`;
             return;
         }
 
         let { latitude, longitude, name } = geoData.results[0];
 
-        /* -------------------------------------------------
-           2. Get weather data:
-           - current
-           - hourly forecast (24 hours)
-           - daily forecast (7 days)
-           - yesterday (past)
-        ---------------------------------------------------*/
-        let today = new Date().toISOString().split("T")[0];
-        let yesterday = new Date(Date.now() - 86400000)
-            .toISOString().split("T")[0];
-
         let url =
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
-            `&current_weather=true` +
-            `&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,weathercode` +
-            `&past_days=1&forecast_days=7&timezone=auto`;
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,weathercode&past_days=1&forecast_days=7&timezone=auto`;
 
         let res = await fetch(url);
         let data = await res.json();
-
         let cw = data.current_weather;
+
         let [desc, iconCode] = weatherInfo(cw.weathercode);
 
-        // Set animated background
-        document.body.className = bgByWeather(cw.weathercode);
-
-        // Build 7-day forecast
+        // Build forecast cards
         let forecastHTML = "";
         for (let i = 0; i < 7; i++) {
-            let day = data.daily.time[i].substring(5);
-            let max = data.daily.temperature_2m_max[i];
+            let d = data.daily.time[i].slice(5);
             let min = data.daily.temperature_2m_min[i];
-            let code = data.daily.weathercode[i];
-            let [d, ic] = weatherInfo(code);
+            let max = data.daily.temperature_2m_max[i];
+            let [desc2, ic2] = weatherInfo(data.daily.weathercode[i]);
 
             forecastHTML += `
                 <div class="forecast-card">
-                    <div>${day}</div>
-                    <img src="https://openweathermap.org/img/wn/${ic}.png">
                     <div>${d}</div>
+                    <img src="https://openweathermap.org/img/wn/${ic2}.png">
+                    <div>${desc2}</div>
                     <div>${min}° / ${max}°</div>
-                </div>
-            `;
+                </div>`;
         }
 
-        // Yesterday:
-        let yesterdayTemp = data.daily.temperature_2m_max[0];
-
-        // Fill HTML
         loader.style.display = "none";
 
         weatherBox.style.display = "block";
         weatherBox.innerHTML = `
-            <h3>${name}</h3>
             <img class="icon" src="https://openweathermap.org/img/wn/${iconCode}.png">
             <div class="temp">${cw.temperature}°C</div>
             <p><b>${desc}</b></p>
 
             <div class="details">
                 <p><b>Wind:</b> ${cw.windspeed} km/h</p>
-                <p><b>Feels-like:</b> ${cw.temperature}°C (approx)</p>
-                <p><b>Yesterday Max Temp:</b> ${yesterdayTemp}°C</p>
+                <p><b>Feeling:</b> approx ${cw.temperature}°C</p>
             </div>
 
             <h3>7-Day Forecast</h3>
             <div class="forecast">${forecastHTML}</div>
         `;
 
-        /* -------------------------------------------------
-           Build Hourly Chart (Next 24 Hours)
-        ---------------------------------------------------*/
-        let hours = data.hourly.time.slice(0, 24).map(t => t.substring(11, 16));
-        let temps = data.hourly.temperature_2m.slice(0, 24);
-
+        // Hourly Chart
         chartCanvas.style.display = "block";
+        const hours = data.hourly.time.slice(0, 24).map(t => t.slice(11, 16));
+        const temps = data.hourly.temperature_2m.slice(0, 24);
 
         new Chart(chartCanvas, {
             type: "line",
             data: {
                 labels: hours,
                 datasets: [{
-                    label: "Temperature (°C) next 24h",
+                    label: "Next 24h Temperature",
                     data: temps,
                     borderColor: "#fff",
-                    backgroundColor: "rgba(255,255,255,0.3)",
+                    backgroundColor: "rgba(255,255,255,0.25)",
                     fill: true,
-                    tension: 0.3
+                    tension: 0.3,
                 }]
             },
             options: {
                 plugins: { legend: { labels: { color: "#fff" } } },
                 scales: {
-                    x: { ticks: { color: "#fff" } },
-                    y: { ticks: { color: "#fff" } }
+                    x: { ticks: { color: "#fff" }},
+                    y: { ticks: { color: "#fff" }}
                 }
             }
         });
